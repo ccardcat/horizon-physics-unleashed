@@ -15,6 +15,7 @@ on:
       - 'docs/physics-unleashed.md'
       - 'docs/physics-visual.md'
       - 'tools/physics_visual_smoke.py'
+      - 'packaging/physics-windows/**'
   pull_request:
     paths:
       - 'Cargo.toml'
@@ -28,6 +29,7 @@ on:
       - 'docs/physics-unleashed.md'
       - 'docs/physics-visual.md'
       - 'tools/physics_visual_smoke.py'
+      - 'packaging/physics-windows/**'
 permissions:
   contents: read
 concurrency:
@@ -95,3 +97,74 @@ jobs:
           path: physics-unleashed-linux.tar.gz
           if-no-files-found: error
           retention-days: 7
+  windows:
+    name: Windows x64 EXE
+    runs-on: windows-2022
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      CARGO_BUILD_JOBS: '2'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+      CARGO_PROFILE_FAST_DEBUG: '0'
+      CARGO_PROFILE_FAST_OPT_LEVEL: '1'
+      CARGO_PROFILE_FAST_INCREMENTAL: 'false'
+      # Match Horizon's portable Windows builds: no VC++ redistributable needed.
+      RUSTFLAGS: '-C target-feature=+crt-static'
+      HORIZON_LAUNCHER_NO_SELF_UPDATE: '1'
+      HORIZON_NO_AUDIO: '1'
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Rust toolchain
+        run: rustup toolchain install stable --profile minimal
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: physics-unleashed-windows
+      - name: Isolate runtime checks from player data
+        run: |
+          $physicsScratch = Join-Path $env:RUNNER_TEMP ('physics-' + [guid]::NewGuid().ToString())
+          foreach ($variable in @('HORIZON_HOME','HORIZON_LAUNCHER_HOME','XDG_DATA_HOME','XDG_CONFIG_HOME','HORIZON_LAUNCHER_TRASH','HORIZON_LAUNCHER_CLIPBOARD','HORIZON_LAUNCHER_DESKTOP')) {
+            $directory = Join-Path $physicsScratch $variable
+            New-Item -ItemType Directory -Force $directory | Out-Null
+            "$variable=$directory" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          }
+      - name: Native Windows physics tests
+        run: |
+          cargo +stable test --locked -p physics-core
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo +stable test --locked -p horizon-protocol --lib
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo +stable test --locked -p horizon-client --features physics-unleashed --test physics_dimension --test physics_visual
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build optimized Windows client and control EXEs (audio and controllers enabled)
+        run: |
+          cargo +stable build --locked --profile fast -p horizon-client --features physics-unleashed --bins
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/check_imports.py target/fast/horizon-client.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/check_imports.py target/fast/horizon-ctl.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & target/fast/horizon-client.exe --help
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & target/fast/horizon-ctl.exe --help
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Package portable Windows folder
+        run: |
+          New-Item -ItemType Directory -Force windows-artifacts | Out-Null
+          Copy-Item target/fast/horizon-client.exe,target/fast/horizon-ctl.exe windows-artifacts/
+          Copy-Item research-lock.json windows-artifacts/
+          Copy-Item packaging/physics-windows/Start-Physics-Unleashed.cmd,packaging/physics-windows/README-WINDOWS.txt windows-artifacts/
+          git rev-parse HEAD | Set-Content -Encoding utf8 windows-artifacts/COMMIT.txt
+          $files = Get-ChildItem windows-artifacts -File
+          $files | ForEach-Object { '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name } | Set-Content -Encoding utf8 windows-artifacts/SHA256SUMS.txt
+      - name: Upload Windows EXEs (download ZIP, extract, open Start-Physics-Unleashed.cmd)
+        uses: actions/upload-artifact@v6
+        with:
+          name: PHYSICS-UNLEASHED-Windows-x64
+          path: windows-artifacts/
+          if-no-files-found: error
+          retention-days: 14

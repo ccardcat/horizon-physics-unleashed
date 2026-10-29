@@ -7,6 +7,16 @@ procedural replacement texture, client-side collision solver or bundled game dat
 
 ## Download/build
 
+For **Windows 10/11 x64**, open a successful PHYSICS UNLEASHED workflow run and
+download **PHYSICS-UNLEASHED-Windows-x64** from Artifacts. Extract the ZIP and
+double-click **Start-Physics-Unleashed.cmd**. It starts `horizon-client.exe`, keeps
+demo saves in a separate `demo-data` folder, and automatically looks for prepared
+resources in an existing Horizon Launcher installation. If needed, it opens a
+folder picker. See the included `README-WINDOWS.txt` for the game's resource
+prerequisite; proprietary Minecraft files are not part of the download.
+The Windows job builds native MSVC EXEs with audio/controllers and a static C
+runtime, runs the physics tests and checks executable imports and startup help.
+
 GitHub Actions workflow **PHYSICS UNLEASHED** runs for this branch and pull requests.
 After a successful run, download `physics-unleashed-linux-<commit>` from its
 Artifacts section, extract the contained `.tar.gz`, and run `sha256sum -c SHA256SUMS`.
