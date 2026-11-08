@@ -1,0 +1,11 @@
+{
+  "title": "itemGroup.atomic_age.tools",
+  "icon": "atomic_age:portal_gun",
+  "items": [
+    "atomic_age:detonator",
+    "atomic_age:laser_cannon",
+    "atomic_age:portal_gun",
+    "atomic_age:portal_reset",
+    "atomic_age:emergency_stop"
+  ]
+}

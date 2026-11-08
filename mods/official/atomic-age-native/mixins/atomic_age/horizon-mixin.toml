@@ -1,0 +1,131 @@
+[mod]
+id = "atomic_age"
+version = "0.5.0"
+
+[compatibility]
+horizon_revision = "fdc87aecdbd116bf1e08adcd062fcbaea8c2e2ca"
+
+[[module]]
+id = "gameplay"
+file = "crates/horizon-client/src/game.rs"
+name = "atomic_age"
+source = "game.rs"
+
+[[module]]
+id = "renderer"
+file = "crates/horizon-client-render/src/gfx.rs"
+name = "atomic_age"
+source = "renderer.rs"
+visibility = "pub"
+
+[[injection]]
+id = "use_air"
+target = "horizon_client::game::native_hooks::Game<'_>::native_use_item"
+kind = "HEAD"
+helper = "use_air.rs"
+bindings = [{name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self"}, {name = "stack", ty = "&horizon_client::items::ItemStack", value = "stack"}, {name = "claimed", ty = "&mut bool", value = "claimed"}]
+
+[[injection]]
+id = "use_block"
+target = "horizon_client::game::native_hooks::Game<'_>::native_use_item_on"
+kind = "HEAD"
+helper = "use_block.rs"
+bindings = [{name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self"}, {name = "stack", ty = "&horizon_client::items::ItemStack", value = "stack"}, {name = "claimed", ty = "&mut bool", value = "claimed"}]
+
+[[injection]]
+id = "duration"
+target = "horizon_client::game::native_hooks::Game<'_>::native_use_duration"
+kind = "HEAD"
+helper = "duration.rs"
+bindings = [{name = "stack", ty = "&horizon_client::items::ItemStack", value = "stack"}, {name = "duration", ty = "&mut i32", value = "duration"}]
+
+[[injection]]
+id = "laser"
+target = "horizon_client::game::native_hooks::Game<'_>::native_on_use_tick"
+kind = "HEAD"
+helper = "laser.rs"
+bindings = [{name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self"}, {name = "stack", ty = "&horizon_client::items::ItemStack", value = "stack"}]
+
+[[injection]]
+id = "tick"
+target = "horizon_client::game::native_hooks::Game<'_>::native_level_tick_post"
+kind = "HEAD"
+helper = "tick.rs"
+bindings = [{name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self"}, {name = "dimension", ty = "&str", value = "dimension"}]
+
+[[injection]]
+id = "receive"
+target = "horizon_client::game::native_hooks::Game<'_>::native_net_from_server"
+kind = "HEAD"
+helper = "receive.rs"
+bindings = [{name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self"}, {name = "channel", ty = "&str", value = "channel"}, {name = "data", ty = "&[u8]", value = "data"}]
+
+[[injection]]
+id = "reset"
+target = "horizon_client::game::native_hooks::Game<'_>::native_world_lifecycle"
+kind = "HEAD"
+helper = "reset.rs"
+bindings = []
+
+[[injection]]
+id = "shake"
+target = "horizon_client::game::native_hooks::Game<'_>::native_camera_shake"
+kind = "HEAD"
+helper = "shake.rs"
+bindings = [{name = "game", ty = "&crate::game::Game<'_>", value = "&*self"}, {name = "shake", ty = "&mut crate::game::NativeShake", value = "shake"}]
+
+[[injection]]
+id = "prepare"
+target = "horizon_client_render::gfx::Renderer::render"
+kind = "HEAD"
+helper = "prepare.rs"
+bindings = [{name = "renderer", ty = "&mut crate::gfx::Renderer", value = "&mut *self"}, {name = "frame", ty = "&crate::gfx::Frame<'_>", value = "frame"}]
+
+[[injection]]
+id = "clip"
+target = "horizon_client_render::gfx::view::View::screen"
+kind = "OVERWRITE"
+helper = "clip.rs"
+bindings = [{name = "yaw", ty = "f32", value = "yaw"}, {name = "pitch", ty = "f32", value = "pitch"}, {name = "fov_degrees", ty = "f32", value = "fov_degrees"}, {name = "aspect", ty = "f32", value = "aspect"}, {name = "far", ty = "f32", value = "far"}]
+
+[[injection]]
+id = "draw"
+target = "horizon_client_render::gfx::native_render::native_world_drawn"
+kind = "HEAD"
+helper = "draw.rs"
+bindings = [{name = "world", ty = "&mut crate::gfx::native_render::WorldDrawn<'_>", value = "world"}]
+
+[[injection]]
+id = "depth"
+target = "horizon_client_render::gfx::native_render::native_render_needs"
+kind = "HEAD"
+helper = "depth.rs"
+bindings = [{name = "needs", ty = "&mut crate::gfx::native_render::RenderNeeds", value = "needs"}]
+
+[[injection]]
+id = "finish"
+target = "horizon_client_render::gfx::Renderer::render"
+kind = "RETURN"
+helper = "finish.rs"
+bindings = [{name = "renderer", ty = "&mut crate::gfx::Renderer", value = "&mut *self"}, {name = "result", ty = "Result<bool>", value = "$value"}]
+
+[[injection]]
+id = "extract_begin"
+target = "horizon_client::game::Game<'_>::entity_geometry"
+kind = "HEAD"
+helper = "extract_begin.rs"
+bindings = [{name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self"}]
+
+[[injection]]
+id = "extract_end"
+target = "horizon_client::game::Game<'_>::entity_geometry"
+kind = "RETURN"
+helper = "extract_end.rs"
+bindings = [{name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self"}, {name = "value", ty = "(Vec<Vertex>, Arc<[StaticSectionSnapshot]>, Vec<[i32; 3]>, StaticCacheFrameStats,)", value = "$value"}]
+
+[[injection]]
+id = "cpu_models"
+target = "horizon_client_render::gfx::Renderer::skins_entities"
+kind = "RETURN"
+helper = "cpu_models.rs"
+bindings = [{name = "value", ty = "bool", value = "$value"}]

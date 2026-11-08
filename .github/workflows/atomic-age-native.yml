@@ -1,0 +1,130 @@
+name: Atomic Age Native Windows
+on:
+  push:
+    branches: [atomic-age/native-fdc87ae]
+permissions:
+  contents: read
+concurrency:
+  group: atomic-age-native-windows
+  cancel-in-progress: true
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    env:
+      CARGO_BUILD_JOBS: '3'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: fdc87aecdbd116bf1e08adcd062fcbaea8c2e2ca
+          path: engine
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: horizon-rust/horizon-mixins
+          ref: 5a64af938ec86b00d53d16a408aabc0038fb3e57
+          path: mixins-tool
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.99.1
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            mixins-tool -> target
+          cache-on-failure: true
+      - name: Build the pinned mixin tool
+        run: cargo build --locked --manifest-path mixins-tool/Cargo.toml -p horizon-mixins-cli
+      - name: Apply native mod to the exact Nightly
+        shell: pwsh
+        run: |
+          python mods/official/atomic-age-native/tools/assemble.py
+          & mixins-tool/target/debug/horizon-mixins.exe apply --workspace engine --mods mods/official/atomic-age-native/mixins --out staged
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: staged -> target
+          shared-key: atomic-age-native-engine-windows
+          cache-on-failure: true
+      - name: Build Windows x64 native game
+        run: cargo build --locked --manifest-path staged/Cargo.toml --profile fast -p horizon-client --bin horizon-client
+      - name: Package original mod content and installer
+        shell: pwsh
+        run: |
+          python -m pip install Pillow==11.3.0
+          python mods/official/atomic-age-native/tools/content.py
+          python mods/official/atomic-age-native/tools/package-windows.py staged/target/fast/horizon-client.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atomic-age-native-0.5.0
+          path: |
+            mods/official/atomic-age-native/dist/Atomic-Age-0.5.0-Windows.zip
+            mods/official/atomic-age-native/dist/atomic_age.hmod
+            mods/official/atomic-age-native/dist/atomic_age.hnmod
+            mods/official/atomic-age-native/dist/atomic_age_content.hmod
+          if-no-files-found: error
+  validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CARGO_BUILD_JOBS: '3'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: fdc87aecdbd116bf1e08adcd062fcbaea8c2e2ca
+          path: engine
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: horizon-rust/horizon-mixins
+          ref: 5a64af938ec86b00d53d16a408aabc0038fb3e57
+          path: mixins-tool
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.99.1
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            mixins-tool -> target
+          cache-on-failure: true
+      - name: Apply the pinned native bundle
+        run: |
+          cargo build --locked --manifest-path mixins-tool/Cargo.toml -p horizon-mixins-cli
+          python mods/official/atomic-age-native/tools/assemble.py
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('engine/CLAUDE.md')
+          if p.is_symlink():
+              text=p.read_text();p.unlink();p.write_text(text)
+          PY
+          mixins-tool/target/debug/horizon-mixins apply --workspace engine --mods mods/official/atomic-age-native/mixins --out staged
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: staged -> target
+          shared-key: atomic-age-native-engine-linux
+          cache-on-failure: true
+      - name: Compile native gameplay and test portal math and GPU effects
+        run: |
+          cargo check --locked --manifest-path staged/Cargo.toml -p horizon-client --lib --no-default-features
+          cargo test --locked --manifest-path staged/Cargo.toml -p horizon-client-render --lib --no-default-features gfx::atomic_age -- --nocapture
+  publish:
+    needs: [windows, validation]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: atomic-age-native-0.5.0
+          path: dist
+      - name: Attach validated build to draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha256sum dist/* > dist/SHA256SUMS.txt
+          gh release upload atomic-age-v0.5.0 dist/* --repo "$GITHUB_REPOSITORY" --clobber
+          gh release edit atomic-age-v0.5.0 --draft=false --prerelease --repo "$GITHUB_REPOSITORY"
