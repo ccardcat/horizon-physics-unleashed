@@ -20,17 +20,17 @@ function Invoke-LauncherJson([string[]]$Command) {
     return ($lines -join "`n" | ConvertFrom-Json)
 }
 # Use the player's currently selected installed Nightly as the resource donor.
-$import = Invoke-LauncherJson @('import-build', (Join-Path $PSScriptRoot 'horizon-client.exe'), '--trust-unsigned')
+$import = Invoke-LauncherJson -Command @('import-build', (Join-Path $PSScriptRoot 'horizon-client.exe'), '--trust-unsigned')
 if (!$import.imported) { throw 'The launcher did not return an imported build id.' }
 $name = 'Atomic Age 0.5 ' + (Get-Date -Format 'yyyyMMdd-HHmmss')
-$instance = Invoke-LauncherJson @('instance', 'create', $name)
+$instance = Invoke-LauncherJson -Command @('instance', 'create', $name)
 if (!$instance.id -or !$instance.home) { throw 'The launcher did not return the new instance folder.' }
-$null = Invoke-LauncherJson @('instance', 'version', $instance.id, $import.imported)
+$null = Invoke-LauncherJson -Command @('instance', 'version', $instance.id, $import.imported)
 $modDir = Join-Path $instance.home 'horizon-mods'
 New-Item -ItemType Directory -Force -Path $modDir | Out-Null
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'atomic_age_content.hmod') -Destination (Join-Path $modDir 'atomic_age.hmod')
 [IO.File]::WriteAllText((Join-Path $instance.home 'horizon-mods.txt'), "mod.atomic_age:true`n", (New-Object Text.UTF8Encoding($false)))
-$null = Invoke-LauncherJson @('instance', 'select', $instance.id)
+$null = Invoke-LauncherJson -Command @('instance', 'select', $instance.id)
 Write-Host "Installed: $name"
 Write-Host "Instance: $($instance.home)"
 Write-Host 'Open Horizon Launcher, press Play, create a creative world.'

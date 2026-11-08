@@ -5,7 +5,8 @@ import json, shutil, zipfile, hashlib
 ROOT=Path(__file__).resolve().parents[1]
 content=ROOT/'content'
 if not content.exists():
-    shutil.copytree('/workspace/atomic-age-content-nightly',content,ignore=shutil.ignore_patterns('target'))
+    raise SystemExit('The checked-in content/ folder is required.')
+(content/'README-RU.txt').unlink(missing_ok=True)
 for folder in [content/'data/atomic_age/function',content/'data/minecraft']:
     if folder.exists(): shutil.rmtree(folder)
 (content/'horizon-mod.toml').write_text('''id = "atomic_age"

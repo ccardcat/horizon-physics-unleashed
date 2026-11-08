@@ -362,6 +362,7 @@ struct EffectGpu {
     layout: wgpu::BindGroupLayout,
     pipeline: wgpu::RenderPipeline,
     sampler: wgpu::Sampler,
+    depth_sampler: wgpu::Sampler,
     white: wgpu::TextureView,
 }
 impl EffectGpu {
@@ -408,6 +409,12 @@ impl EffectGpu {
                     binding: 3,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 4,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
                     count: None,
                 },
             ],
@@ -494,6 +501,10 @@ impl EffectGpu {
                 min_filter: wgpu::FilterMode::Linear,
                 ..Default::default()
             }),
+            depth_sampler: device.create_sampler(&wgpu::SamplerDescriptor {
+                compare: Some(wgpu::CompareFunction::GreaterEqual),
+                ..Default::default()
+            }),
             white: white.create_view(&Default::default()),
         }
     }
@@ -550,6 +561,10 @@ impl EffectGpu {
                 wgpu::BindGroupEntry {
                     binding: 3,
                     resource: wgpu::BindingResource::Sampler(&self.sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: wgpu::BindingResource::Sampler(&self.depth_sampler),
                 },
             ],
         });
@@ -898,6 +913,7 @@ struct Uniform {matrix:mat4x4<f32>,size:vec4<f32>,time:vec4<f32>};
 @group(0) @binding(1) var depth:texture_depth_2d;
 @group(0) @binding(2) var portal:texture_2d<f32>;
 @group(0) @binding(3) var linear:sampler;
+@group(0) @binding(4) var depth_nearest:sampler_comparison;
 struct V { @builtin(position) pos:vec4<f32>, @location(0) uv:vec2<f32>, @location(1) color:vec4<f32>, @location(2) mode:f32 };
 @vertex fn vs(@location(0) p:vec3<f32>,@location(1) uv:vec2<f32>,@location(2) color:vec4<f32>,@location(3) mode:f32)->V {
     var o:V;o.pos=u.matrix*vec4(p,1.);if mode>4.5 {o.pos=vec4(p,1.);}o.uv=uv;o.color=color;o.mode=mode;return o;
@@ -905,9 +921,9 @@ struct V { @builtin(position) pos:vec4<f32>, @location(0) uv:vec2<f32>, @locatio
 fn hash(p:vec2<f32>)->f32 {return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 fn noise(p:vec2<f32>)->f32 {let i=floor(p);let f=fract(p);let w=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1.,0.)),w.x),mix(hash(i+vec2(0.,1.)),hash(i+vec2(1.,1.)),w.x),w.y);}
 @fragment fn fs(v:V)->@location(0) vec4<f32> {
+    let visible=textureSampleCompare(depth,depth_nearest,v.pos.xy/u.size.xy,v.pos.z+0.000008);
     if v.mode>4.5 {return v.color;}
-    let xy=clamp(vec2<i32>(v.pos.xy/u.size.xy*u.size.zw),vec2<i32>(0),vec2<i32>(u.size.zw)-vec2<i32>(1));
-    if v.pos.z+0.000008<textureLoad(depth,xy,0) {discard;}
+    if visible<0.5 {discard;}
     let radius=length(v.uv);
     if v.mode>1.5 && v.mode<2.5 {
         if radius>1. {discard;}

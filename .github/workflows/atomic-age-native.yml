@@ -40,6 +40,7 @@ jobs:
         shell: pwsh
         run: |
           python mods/official/atomic-age-native/tools/assemble.py
+          python -c "from pathlib import Path; p=Path('engine/CLAUDE.md'); text=p.read_text() if p.is_symlink() else None; p.unlink() if text is not None else None; p.write_text(text) if text is not None else None"
           & mixins-tool/target/debug/horizon-mixins.exe apply --workspace engine --mods mods/official/atomic-age-native/mixins --out staged
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: Swatinem/rust-cache@v2
@@ -63,6 +64,7 @@ jobs:
             mods/official/atomic-age-native/dist/atomic_age.hmod
             mods/official/atomic-age-native/dist/atomic_age.hnmod
             mods/official/atomic-age-native/dist/atomic_age_content.hmod
+            mods/official/atomic-age-native/dist/Atomic-Age-0.5.0-Source.zip
           if-no-files-found: error
   validation:
     runs-on: ubuntu-latest
