@@ -1,0 +1,32 @@
+name: Deliver Atomic Age content file
+on:
+  push:
+    branches: [atomic-age/download-hmod]
+permissions:
+  contents: write
+jobs:
+  deliver:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: downloads/atomic-age-0.4.0-nightly-fdc87ae
+      - name: Verify published content-only mod
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,tomllib,zipfile
+          p=Path('downloads/atomic-age-0.4.0-nightly-fdc87ae/atomic_age.hmod')
+          assert hashlib.sha256(p.read_bytes()).hexdigest()=='cc0bb3062a3c8b386082f4433e3c48c0c11c188dafc5f9d6760cc03b9fbf865f'
+          with zipfile.ZipFile(p) as z:
+              assert z.testzip() is None
+              assert 'mod.wasm' not in z.namelist()
+              manifest=tomllib.loads(z.read('horizon-mod.toml').decode())
+              assert manifest['version']=='0.4.0' and manifest['capabilities']==['registries']
+          PY
+      - name: Add normal download attachment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload atomic-age-v0.4.0 downloads/atomic-age-0.4.0-nightly-fdc87ae/atomic_age.hmod --repo "$GITHUB_REPOSITORY"
