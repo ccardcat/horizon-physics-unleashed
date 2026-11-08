@@ -189,14 +189,106 @@ impl Creative {
     /// prepared before it fall back to `creative-tabs.json`'s item ids.
     pub fn load(root: &Path) -> Result<Self> {
         let path = root.join("creative-inventory.json");
-        if path.exists() {
-            Self::from_json(&serde_json::from_slice(&fs::read(path)?)?)
+        let mut creative = if path.exists() {
+            Self::from_json(&serde_json::from_slice(&fs::read(path)?)?)?
         } else {
             Self::from_legacy(&serde_json::from_slice(&fs::read(
                 root.join("creative-tabs.json"),
-            )?)?)
+            )?)?)?
+        };
+        let names = Names::load(root);
+        for namespace in crate::mod_content::namespaces(root) {
+            let dir = root.join(format!("data/{namespace}/horizon/creative_tabs"));
+            if !dir.is_dir() {
+                continue;
+            }
+            let mut files: Vec<_> = fs::read_dir(dir)?.collect::<std::io::Result<Vec<_>>>()?;
+            files.sort_by_key(|e| e.file_name());
+            for file in files {
+                let path = file.path();
+                if path.extension().is_none_or(|e| e != "json") {
+                    continue;
+                }
+                let id = format!(
+                    "{namespace}:{}",
+                    path.file_stem().unwrap().to_string_lossy()
+                );
+                let result = fs::read(&path)
+                    .map_err(|e| e.to_string())
+                    .and_then(|bytes| serde_json::from_slice(&bytes).map_err(|e| e.to_string()))
+                    .and_then(|raw| creative.add_content_tab(&id, &raw, &names));
+                if let Err(e) = result {
+                    log::warn!("Horizon: creative tab {id}: {e}");
+                }
+            }
         }
+        Ok(creative)
     }
+
+    /// Mod tabs use vacant buttons (the vanilla hotbar tab is not displayed).
+    /// No content: no extra button and no change to vanilla search ordering.
+    fn add_content_tab(
+        &mut self,
+        id: &str,
+        raw: &Value,
+        names: &Names,
+    ) -> std::result::Result<(), String> {
+        if self.tabs.iter().any(|tab| tab.id == id) {
+            return Err("duplicate tab id".into());
+        }
+        let title = raw["title"]
+            .as_str()
+            .filter(|s| !s.is_empty())
+            .ok_or("missing title")?;
+        let ids = raw["items"]
+            .as_array()
+            .filter(|a| !a.is_empty() && a.len() <= 4096)
+            .ok_or("expected 1..4096 items")?;
+        let mut items = Vec::new();
+        for id in ids {
+            let id = id
+                .as_str()
+                .filter(|s| s.contains(':') && !s.contains(char::is_whitespace))
+                .ok_or("invalid item id")?;
+            if !items.iter().any(|s: &ItemStack| s.item.as_ref() == id) {
+                items.push(ItemStack::new(id, 1));
+            }
+        }
+        let (top, column) = [true, false]
+            .into_iter()
+            .flat_map(|top| (0..7).map(move |col| (top, col)))
+            .find(|(top, col)| !self.tabs.iter().any(|t| t.top == *top && t.column == *col))
+            .ok_or("no free creative tab buttons")?;
+        for stack in &items {
+            if !self.search_items.iter().any(|s| s.item == stack.item) {
+                let (namespace, path) = split_id(&java_lower(&stack.item));
+                self.search_index.push(SearchEntry {
+                    namespace,
+                    path,
+                    lines: vec![java_lower(&names.item(&stack.item))],
+                    tags: Vec::new(),
+                });
+                self.search_items.push(stack.clone());
+            }
+        }
+        // Keep the search tab's own list consistent with the search index.
+        for tab in self.tabs.iter_mut().filter(|t| t.search) {
+            tab.items = self.search_items.clone();
+        }
+        self.tabs.push(Tab {
+            id: id.into(),
+            title: title.into(),
+            icon: raw["icon"].as_str().unwrap_or(&items[0].item).into(),
+            items,
+            top,
+            column,
+            search: false,
+            inventory: false,
+        });
+        self.shown.lock().unwrap().take();
+        Ok(())
+    }
+
     pub fn from_json(raw: &Value) -> Result<Self> {
         let mut tabs = Vec::new();
         let mut search_items = Vec::new();
@@ -688,6 +780,96 @@ mod tests {
         let max = |s: &ItemStack| if s.item.ends_with("pearl") { 16 } else { 64 };
         let effect = click_display(&mut carried, Some(&stack("stone", 1)), max, button, input);
         (carried, effect)
+    }
+
+    fn content_test_creative() -> Creative {
+        let tabs: Vec<_> = (0..7).flat_map(|column| [true, false].into_iter().filter_map(move |top| {
+            if top && column == 5 { return None; }
+            Some(serde_json::json!({"id": format!("minecraft:test_{top}_{column}"), "title":"Vanilla", "row": if top {"TOP"} else {"BOTTOM"}, "column":column, "type":if top && column == 6 {"SEARCH"} else {"CATEGORY"}, "items": ["minecraft:stone"]}))
+        })).collect();
+        Creative::from_json(&serde_json::json!({"tabs":tabs})).unwrap()
+    }
+
+    #[test]
+    fn content_tab_uses_free_button_and_adds_searchable_items() {
+        let mut creative = content_test_creative();
+        let names = Names::default();
+        let original = creative.tabs.len();
+        creative.add_content_tab("atomic_age:bombs", &serde_json::json!({
+            "title":"Bombs", "icon":"atomic_age:nuclear_bomb",
+            "items":["atomic_age:nuclear_bomb", "atomic_age:detonator", "atomic_age:nuclear_bomb"]
+        }), &names).unwrap();
+        let tab = creative.tabs.last().unwrap();
+        assert_eq!((tab.top, tab.column), (true, 5));
+        assert_eq!(tab.items.len(), 2);
+        assert_eq!(creative.tabs.len(), original + 1);
+        assert_eq!(creative.search_results("atomic_age:", &names).len(), 2);
+        assert_eq!(creative.search_results("nuclear", &names).len(), 1);
+        assert_eq!(
+            creative.tabs.iter().find(|t| t.search).unwrap().items.len(),
+            creative.search_items.len()
+        );
+        assert!(
+            creative
+                .add_content_tab(
+                    "other:full",
+                    &serde_json::json!({"title":"Full", "items":["other:bomb"]}),
+                    &names
+                )
+                .is_err()
+        );
+        assert_eq!(creative.search_results("other:", &names).len(), 0);
+    }
+
+    #[test]
+    fn content_tabs_load_only_from_enabled_namespaces() {
+        let root =
+            std::env::temp_dir().join(format!("horizon-creative-content-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let dir = root.join("data/atomic_age/horizon/creative_tabs");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(root.join("creative-inventory.json"), r#"{"tabs":[{"id":"minecraft:search","title":"Search","type":"SEARCH","row":"TOP","column":6,"items":["minecraft:stone"]}]}"#).unwrap();
+        fs::write(
+            dir.join("bombs.json"),
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../mods/official/atomic-age/data/atomic_age/horizon/creative_tabs/bombs.json"
+            )),
+        )
+        .unwrap();
+        assert_eq!(Creative::load(&root).unwrap().tabs.len(), 1);
+        fs::write(root.join("horizon-mod-content.json"), r#"["atomic_age"]"#).unwrap();
+        let creative = Creative::load(&root).unwrap();
+        let tab = creative
+            .tabs
+            .iter()
+            .find(|t| t.id == "atomic_age:bombs")
+            .unwrap();
+        assert_eq!(tab.items.len(), 7);
+        assert_eq!(tab.icon, "atomic_age:nuclear_bomb");
+        assert_eq!(
+            creative
+                .search_results("atomic_age:", &Names::default())
+                .len(),
+            7
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn invalid_content_tab_does_not_change_inventory() {
+        let mut creative = content_test_creative();
+        let count = creative.tabs.len();
+        assert!(
+            creative
+                .add_content_tab(
+                    "atomic_age:bombs",
+                    &serde_json::json!({"title":"Bombs", "items":["bad id"]}),
+                    &Names::default()
+                )
+                .is_err()
+        );
+        assert_eq!(creative.tabs.len(), count);
     }
 
     #[test]

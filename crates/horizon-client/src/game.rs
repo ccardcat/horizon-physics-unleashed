@@ -11070,8 +11070,15 @@ impl Game<'_> {
     }
     /// A creative tab's title: `itemGroup.*`, else the export's English title.
     fn creative_tab_title(&self, tab: &horizon_client::creative::Tab) -> String {
-        horizon_client::creative::item_group_key(&tab.id)
-            .map_or_else(|| tab.title.clone(), |key| self.translate(key, &tab.title))
+        horizon_client::creative::item_group_key(&tab.id).map_or_else(
+            || {
+                self.translate(
+                    &format!("itemGroup.{}", tab.id.replace(':', ".")),
+                    &tab.title,
+                )
+            },
+            |key| self.translate(key, &tab.title),
+        )
     }
     /// Vanilla tooltip: dark box with a purple gradient border.
     fn tooltip(&self, batch: &mut HudBatch, text: &str, x: f32, y: f32) {

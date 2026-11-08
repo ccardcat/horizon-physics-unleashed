@@ -208,6 +208,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "atomic-age"
+version = "0.3.0"
+dependencies = [
+ "horizon-mod-sdk",
+ "horizon-mods",
+]
+
+[[package]]
 name = "atomic-waker"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

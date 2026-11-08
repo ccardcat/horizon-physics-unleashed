@@ -1,0 +1,42 @@
+[[step]]
+command = "atomic help"
+expect.commands = ["nuke", "singularity", "cluster", "thermobaric", "drill", "meteor", "atomic"]
+expect.feedback = "Aim at a block: /nuke /singularity /cluster /thermobaric /drill /meteor. Five-second fuse; /atomic cancel stops future waves. Cheats required. Destructive radius up to about 42 blocks."
+
+[[step]]
+command = "nuke extra"
+expect.error = "Use /nuke with no arguments; aim at a block."
+
+[[step]]
+command = "singularity"
+expect.error = "Aim at a block within 96 blocks"
+
+[[step]]
+command = "atomic cancel"
+expect.feedback = "Sequence cancelled. Already spawned TNT cannot be recalled."
+expect.panel = []
+
+[[step]]
+title-screen = true
+command = "nuke"
+expect.error = "Join a world first"
+
+[[step]]
+player = { dimension = "minecraft:overworld" }
+command = "cluster"
+expect.error = "Aim at a block within 96 blocks"
+
+[[step]]
+player = { dimension = "minecraft:overworld" }
+command = "thermobaric"
+expect.error = "Aim at a block within 96 blocks"
+
+[[step]]
+player = { dimension = "minecraft:overworld" }
+command = "drill"
+expect.error = "Aim at a block within 96 blocks"
+
+[[step]]
+player = { dimension = "minecraft:overworld" }
+command = "meteor"
+expect.error = "Aim at a block within 96 blocks"

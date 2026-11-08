@@ -1,0 +1,13 @@
+{
+  "title": "Bombs",
+  "icon": "atomic_age:nuclear_bomb",
+  "items": [
+    "atomic_age:nuclear_bomb",
+    "atomic_age:singularity_bomb",
+    "atomic_age:cluster_bomb",
+    "atomic_age:thermobaric_bomb",
+    "atomic_age:drill_bomb",
+    "atomic_age:meteor_bomb",
+    "atomic_age:detonator"
+  ]
+}

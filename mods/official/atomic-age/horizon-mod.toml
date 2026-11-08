@@ -1,0 +1,9 @@
+id = "atomic_age"
+name = "Atomic Age"
+version = "0.3.0"
+description = "Six destructive payloads: nuclear, singularity, cluster, thermobaric, drill and meteor. Animated shockwaves, fire domes, mushroom clouds and orbital trails. Cheats required."
+authors = ["ccardcat"]
+api = "0.2"
+side = "both"
+capabilities = ["registries", "input", "chat", "game-read", "command", "hud", "render"]
+experimental = ["render", "input"]

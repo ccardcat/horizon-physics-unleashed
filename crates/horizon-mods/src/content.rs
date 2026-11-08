@@ -118,6 +118,39 @@ struct ItemFile {
     rarity: Option<Rarity>,
 }
 
+/// A creative-inventory category supplied by a content mod.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CreativeTab {
+    pub title: String,
+    pub icon: String,
+    pub items: Vec<String>,
+}
+impl CreativeTab {
+    pub fn check(&self) -> Result<(), String> {
+        let id = |s: &str| {
+            s.split_once(':').is_some_and(|(namespace, path)| {
+                !namespace.is_empty()
+                    && !path.is_empty()
+                    && s.bytes().all(|b| {
+                        b.is_ascii_lowercase() || b.is_ascii_digit() || b"_:-./".contains(&b)
+                    })
+            })
+        };
+        if self.title.is_empty() || self.title.len() > 256 {
+            return Err("tab title must be 1..256 bytes".into());
+        }
+        if !id(&self.icon)
+            || self.items.is_empty()
+            || self.items.len() > 4096
+            || self.items.iter().any(|s| !id(s))
+        {
+            return Err("tab needs an icon and 1..4096 namespaced item ids".into());
+        }
+        Ok(())
+    }
+}
+
 /// An item the mod adds: a vanilla template item's components under a new
 /// id, with these changed.
 #[derive(Clone, Debug, PartialEq)]
@@ -311,9 +344,15 @@ impl Content {
                 blocks.push((block, name.clone()));
             } else if let Some(item) = parse("item") {
                 items.push((item, name.clone()));
+            } else if parse("creative_tabs").is_some()
+                && !decl.trim_start_matches("creative_tabs/").contains('/')
+            {
+                let tab: CreativeTab = serde_json::from_slice(&self.file(name)?)
+                    .map_err(|e| format!("{name}: {e}"))?;
+                tab.check().map_err(|e| format!("{name}: {e}"))?;
             } else {
                 return Err(format!(
-                    "{name}: data/{id}/horizon/ holds block/*.json and item/*.json only"
+                    "{name}: data/{id}/horizon/ holds block/*.json, item/*.json and creative_tabs/*.json only"
                 ));
             }
         }
@@ -452,6 +491,33 @@ capabilities = ["registries"]
         let content = package.and_then(|p| Content::read(&path, &p.manifest));
         std::fs::remove_dir_all(&dir).unwrap();
         content
+    }
+
+    #[test]
+    fn creative_tab_content_is_validated_and_packaged() {
+        let tab = br#"{"title":"Bombs", "icon":"ruby:bomb", "items":["ruby:bomb"]}"#;
+        let content = hmod(
+            "creative-tab",
+            MANIFEST_TEXT,
+            &[("data/ruby/horizon/creative_tabs/bombs.json", tab)],
+        )
+        .unwrap();
+        assert_eq!(
+            content.files,
+            ["data/ruby/horizon/creative_tabs/bombs.json"]
+        );
+        assert!(content.blocks.is_empty());
+        assert!(
+            hmod(
+                "invalid-creative-tab",
+                MANIFEST_TEXT,
+                &[(
+                    "data/ruby/horizon/creative_tabs/bombs.json",
+                    br#"{"title":"Bombs", "icon":"ruby:bomb", "items":[]}"#
+                )]
+            )
+            .is_err()
+        );
     }
 
     #[test]

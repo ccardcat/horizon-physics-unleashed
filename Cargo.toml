@@ -43,6 +43,7 @@ members = [
     "mods/official/zoom",
     "xtask",
     "mods/official/recipes",
+    "mods/official/atomic-age",
 ]
 resolver = "2"
 

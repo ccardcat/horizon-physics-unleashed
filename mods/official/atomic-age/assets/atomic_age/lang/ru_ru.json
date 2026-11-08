@@ -1,0 +1,10 @@
+{
+  "block.atomic_age.nuclear_bomb": "Ядерная бомба",
+  "block.atomic_age.singularity_bomb": "Бомба сингулярности",
+  "block.atomic_age.cluster_bomb": "Кассетная бомба",
+  "block.atomic_age.thermobaric_bomb": "Термобарическая бомба",
+  "block.atomic_age.drill_bomb": "Буровая бомба",
+  "block.atomic_age.meteor_bomb": "Орбитальная бомба",
+  "item.atomic_age.detonator": "Пульт подрыва",
+  "itemGroup.atomic_age.bombs": "Бомбы"
+}

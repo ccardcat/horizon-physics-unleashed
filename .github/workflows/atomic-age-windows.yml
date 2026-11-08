@@ -1,0 +1,96 @@
+name: Atomic Age Windows
+on:
+  push:
+    branches: [atomic-age/windows]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: atomic-age-windows-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 60
+    env:
+      CARGO_BUILD_JOBS: '2'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+      CARGO_PROFILE_FAST_DEBUG: '0'
+      CARGO_PROFILE_FAST_OPT_LEVEL: '1'
+      CARGO_PROFILE_FAST_INCREMENTAL: 'false'
+      RUSTFLAGS: '-C target-feature=+crt-static'
+      HORIZON_VERSION: '0.3.0-atomic-age'
+      HORIZON_LAUNCHER_NO_SELF_UPDATE: '1'
+      HORIZON_NO_AUDIO: '1'
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: physics-unleashed-windows
+      - name: Use scratch directories for runtime checks
+        run: |
+          $scratch = Join-Path $env:RUNNER_TEMP ('atomic-' + [guid]::NewGuid().ToString())
+          foreach ($variable in @('HORIZON_HOME','HORIZON_LAUNCHER_HOME','XDG_DATA_HOME','XDG_CONFIG_HOME','HORIZON_LAUNCHER_TRASH','HORIZON_LAUNCHER_CLIPBOARD','HORIZON_LAUNCHER_DESKTOP')) {
+            $directory = Join-Path $scratch $variable
+            New-Item -ItemType Directory -Force $directory | Out-Null
+            "$variable=$directory" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          }
+      - name: Build Windows EXEs with physics and WASM mods
+        run: |
+          cargo build --locked --profile fast -p horizon-client --features physics-unleashed,mods --bins
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Check Windows imports and startup
+        run: |
+          python tools/check_imports.py target/fast/horizon-client.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/check_imports.py target/fast/horizon-ctl.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $help = & target/fast/horizon-client.exe --help
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (($help -join "`n") -notmatch '--dev-mod') { throw 'No mod startup flag in client' }
+          & target/fast/horizon-ctl.exe --help
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $tokens = $null; $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $pwd 'packaging/atomic-windows/Start-Atomic-Age.ps1'), [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count) { throw ($errors -join "`n") }
+      - name: Test creative inventory on Windows
+        run: |
+          cargo test --locked -p horizon-client --features physics-unleashed,mods --lib creative::tests::
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Package Windows client and mod
+        run: |
+          New-Item -ItemType Directory -Force windows-artifacts | Out-Null
+          Copy-Item target/fast/horizon-client.exe,target/fast/horizon-ctl.exe windows-artifacts/
+          Copy-Item packaging/atomic-windows/* windows-artifacts/
+          Copy-Item research-lock.json windows-artifacts/
+          git rev-parse HEAD | Set-Content -Encoding utf8 windows-artifacts/COMMIT.txt
+          Get-ChildItem windows-artifacts -File | ForEach-Object {
+            '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name
+          } | Set-Content -Encoding utf8 windows-artifacts/SHA256SUMS.txt
+          Compress-Archive -Path windows-artifacts/* -DestinationPath atomic-age-0.3.0-windows-x64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atomic-age-windows-zip
+          path: atomic-age-0.3.0-windows-x64.zip
+          if-no-files-found: error
+          retention-days: 14
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: atomic-age-windows-zip
+      - name: Attach verified Windows archive to Atomic Age release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload atomic-age-v0.3.0 atomic-age-0.3.0-windows-x64.zip --repo "$GITHUB_REPOSITORY"

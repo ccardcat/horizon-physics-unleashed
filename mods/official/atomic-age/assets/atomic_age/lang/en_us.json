@@ -1,0 +1,10 @@
+{
+  "block.atomic_age.nuclear_bomb": "Nuclear Bomb",
+  "block.atomic_age.singularity_bomb": "Singularity Bomb",
+  "block.atomic_age.cluster_bomb": "Cluster Bomb",
+  "block.atomic_age.thermobaric_bomb": "Thermobaric Bomb",
+  "block.atomic_age.drill_bomb": "Earthbreaker Bomb",
+  "block.atomic_age.meteor_bomb": "Orbital Bomb",
+  "item.atomic_age.detonator": "Remote Detonator",
+  "itemGroup.atomic_age.bombs": "Bombs"
+}
