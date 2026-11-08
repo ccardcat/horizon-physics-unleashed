@@ -62,7 +62,7 @@ jobs:
           if ($errors.Count) { throw ($errors -join "`n") }
       - name: Test creative inventory on Windows
         run: |
-          cargo test --locked -p horizon-client --features physics-unleashed,mods --lib creative::tests::
+          cargo test --locked --profile fast -p horizon-client --features physics-unleashed,mods --lib creative::tests::
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Package Windows client and mod
         run: |
