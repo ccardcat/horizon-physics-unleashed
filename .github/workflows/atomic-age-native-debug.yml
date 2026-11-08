@@ -50,13 +50,17 @@ jobs:
       - name: Report native validation details
         run: |
           python - <<'PYTHON'
-          import subprocess,sys
+          import subprocess,sys,re
           commands=[['cargo','check','--locked','--manifest-path','staged/Cargo.toml','-p','horizon-client','--lib','--no-default-features'],['cargo','test','--locked','--manifest-path','staged/Cargo.toml','-p','horizon-client-render','--lib','--no-default-features','gfx::atomic_age','--','--nocapture']]
           for args in commands:
               p=subprocess.run(args,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)
               print(p.stdout,flush=True)
               if p.returncode:
-                  tail=p.stdout[-14000:].replace('%','%25').replace('\r','%0D').replace('\n','%0A')
-                  print('::error title=Native validation details::'+tail,flush=True)
+                  clean=re.sub(r'\x1b\[[0-9;]*m','',p.stdout)
+                  lines=[line for line in clean.splitlines() if re.search('error|failed|Caused|panic|signal|killed|undefined|process',line,re.I)]
+                  report='\n'.join(line[:800]+' ... '+line[-300:] if len(line)>1200 else line for line in lines)+'\nFINAL: '+clean[-1500:]
+                  for i in range(0,len(report),2400):
+                      chunk=report[i:i+2400].replace('%','%25').replace('\r','%0D').replace('\n','%0A')
+                      print('::error title=Native diagnostic '+str(i)+'::'+chunk,flush=True)
                   sys.exit(p.returncode)
           PYTHON
