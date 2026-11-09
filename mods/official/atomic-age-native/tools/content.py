@@ -17,9 +17,9 @@ authors = ["ccardcat"]
 api = "0.2"
 side = "both"
 capabilities = ["registries"]
-''')
+''', encoding="utf-8")
 def write(path,obj):
-    path=content/path;path.parent.mkdir(parents=True,exist_ok=True);path.write_text(json.dumps(obj,ensure_ascii=False,indent=2)+'\n')
+    path=content/path;path.parent.mkdir(parents=True,exist_ok=True);path.write_text(json.dumps(obj,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
 tools=['detonator','laser_cannon','portal_gun','portal_reset','emergency_stop']
 for item in tools:
     write(Path(f'data/atomic_age/horizon/item/{item}.json'),dict(template='minecraft:stick',max_stack_size=1,rarity='epic',components={'minecraft:lore':[{'translate':f'atomic_age.{item}.hint'}]}))
@@ -79,7 +79,7 @@ en={
  'atomic_age.portal_surface':'Needs two solid blocks without a container',
 }
 for locale,addition in [('ru_ru',ru),('en_us',en)]:
-    p=Path(f'assets/atomic_age/lang/{locale}.json');current=json.loads((content/p).read_text());current.update(addition);write(p,current)
+    p=Path(f'assets/atomic_age/lang/{locale}.json');current=json.loads((content/p).read_text(encoding='utf-8'));current.update(addition);write(p,current)
 if __name__=='__main__':
     output=ROOT/'dist';output.mkdir(exist_ok=True)
     for filename,hybrid in [('atomic_age.hmod',True),('atomic_age.hnmod',False)]:

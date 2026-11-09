@@ -13,6 +13,7 @@ jobs:
     timeout-minutes: 90
     env:
       CARGO_BUILD_JOBS: '3'
+      PYTHONUTF8: '1'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -50,11 +51,15 @@ jobs:
           cache-on-failure: true
       - name: Build Windows x64 native game
         run: cargo build --locked --manifest-path staged/Cargo.toml --profile fast -p horizon-client --bin horizon-client
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atomic-age-client-0.5.0
+          path: staged/target/fast/horizon-client.exe
+          if-no-files-found: error
       - name: Package original mod content and installer
         shell: pwsh
         run: |
-          python -m pip install Pillow==11.3.0
-          python mods/official/atomic-age-native/tools/content.py
+          python mods/official/atomic-age-native/tools/package-mod.py
           python mods/official/atomic-age-native/tools/package-windows.py staged/target/fast/horizon-client.exe
       - uses: actions/upload-artifact@v4
         with:
@@ -71,6 +76,7 @@ jobs:
     timeout-minutes: 45
     env:
       CARGO_BUILD_JOBS: '3'
+      PYTHONUTF8: '1'
     steps:
       - uses: actions/checkout@v4
         with:
