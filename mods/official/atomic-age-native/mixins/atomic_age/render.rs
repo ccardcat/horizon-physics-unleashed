@@ -597,7 +597,7 @@ pub fn draw(world: &mut super::native_render::WorldDrawn<'_>) {
             if blast.kind == 2 {
                 for i in 0..21 {
                     let t = age - i as f32 * 3.;
-                    if !(0. ..35.).contains(&t) {
+                    if !(0.0..35.0).contains(&t) {
                         continue;
                     }
                     let a = i as f32 * 3. * 2.39996;
@@ -756,7 +756,7 @@ pub fn draw(world: &mut super::native_render::WorldDrawn<'_>) {
             .iter()
             .map(|b| {
                 let t = b.age + elapsed;
-                if (0. ..8.).contains(&t) {
+                if (0.0..8.0).contains(&t) {
                     (1. - t / 8.)
                         * (1. - world.camera.distance(DVec3::from_array(b.center)) as f32 / 256.)
                             .max(0.)

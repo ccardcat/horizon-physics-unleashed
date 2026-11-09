@@ -404,7 +404,7 @@ pub(super) fn level_tick(game: &mut Game<'_>, dimension: &str) {
         if blast.age >= 0. {
             queue_blasts(&mut state, &blast);
         }
-        if blast.kind == 1 && (0. ..80.).contains(&blast.age) {
+        if blast.kind == 1 && (0.0..80.0).contains(&blast.age) {
             for mob in game.native_mobs(dimension) {
                 let delta = DVec3::from_array(blast.center) - DVec3::from_array(mob.pos);
                 if delta.length_squared() < 36. * 36. {
