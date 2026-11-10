@@ -1,0 +1,17 @@
+name: Verify Atomic Age installer on Windows PowerShell
+on:
+  push:
+    branches: [atomic-age/installer-fix]
+permissions:
+  contents: read
+jobs:
+  windows-installer:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Exercise actual Windows GUI executable with Windows PowerShell 5.1
+        shell: pwsh
+        run: powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File mods/official/atomic-age-native/tests/installer-windows.ps1
