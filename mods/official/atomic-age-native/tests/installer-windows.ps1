@@ -25,6 +25,7 @@ public static class LauncherFixture {
         File.AppendAllText(Path.Combine(root,"calls.jsonl"),json.Serialize(args)+"\n");
         string command = args.Length > 1 ? args[1] : "";
         if (command == "fail") { error.WriteLine("native importer: source Nightly missing \u041e\u0448\u0438\u0431\u043a\u0430"); return 17; }
+        if (command == "diskfull") { error.WriteLine("Could not copy C:\\Horizon\\versions\\nightly\\.local: disk full (os error 112)"); return 1; }
         if (command == "empty") { error.WriteLine("no JSON fixture"); return 0; }
         if (command == "invalid") { output.WriteLine("not JSON fixture"); return 0; }
         if (command == "warning") { error.Write(new string('w',200000)); }
@@ -49,6 +50,9 @@ try { $null = Invoke-LauncherJson -Command @('fail') } catch { $thrown = $_.Exce
 if (!$thrown -or !$thrown.Contains('exit code 17') -or !$thrown.Contains('source Nightly missing')) { throw 'Native stderr/exit code was lost.' }
 $nativeUnicode = [string][char]0x041E + [char]0x0448 + [char]0x0438 + [char]0x0431 + [char]0x043A + [char]0x0430
 if (!$thrown.Contains($nativeUnicode)) { throw 'UTF-8 native error text was corrupted.' }
+$thrown = $null
+try { $null = Invoke-LauncherJson -Command @('diskfull') } catch { $thrown = $_.Exception.Message }
+if (!$thrown -or !$thrown.Contains('Not enough free space') -or !$thrown.Contains('os error 112')) { throw 'Disk-full error lost its cause or recovery instructions.' }
 foreach ($case in @('empty','invalid')) {
     $thrown = $null
     try { $null = Invoke-LauncherJson -Command @($case) } catch { $thrown = $_.Exception.Message }

@@ -15,3 +15,17 @@ jobs:
       - name: Exercise actual Windows GUI executable with Windows PowerShell 5.1
         shell: pwsh
         run: powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File mods/official/atomic-age-native/tests/installer-windows.ps1
+  deliver:
+    needs: windows-installer
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Repackage verified existing client with tested installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python mods/official/atomic-age-native/tools/publish-installer-fix.py

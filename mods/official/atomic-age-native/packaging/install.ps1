@@ -56,6 +56,9 @@ function Invoke-LauncherJson([string[]]$Command) {
     if ($code -ne 0) {
         $details = ($stderr + "`n" + $stdout).Trim()
         if (!$details) { $details = 'The launcher returned no diagnostic text.' }
+        if ($details -match 'os error 112') {
+            $details = "Not enough free space in Horizon's version storage. The ZIP location does not control it.`nIn Horizon Launcher, use Settings > Data folder > Move... to choose an empty folder on a drive with enough space, or free space on the current drive. Then retry.`n`n$details"
+        }
         throw "Horizon Launcher exit code ${code}:`n$details`nCommand: $($Command -join ' ')"
     }
     if ([string]::IsNullOrWhiteSpace($stdout)) {
